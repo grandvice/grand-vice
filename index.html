@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#12091f">
+<title>GRAND VICE — Démo</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090812;color:#fff;font-family:Arial,sans-serif;touch-action:none}
+#game{display:block;width:100vw;height:100vh;background:#111}
+#hud{position:fixed;inset:0;pointer-events:none}
+.brand{position:absolute;top:12px;left:14px;font-weight:900;letter-spacing:2px;text-shadow:0 0 12px #ff35d4;font-size:18px}
+.money{position:absolute;top:14px;right:14px;color:#8affb0;font-weight:bold;text-shadow:0 2px 4px #000}
+.hint{position:absolute;top:46px;left:14px;font-size:12px;color:#eee;background:#160f25cc;padding:7px 10px;border:1px solid #a72cbd;border-radius:8px}
+#controls{position:absolute;bottom:18px;left:15px;display:grid;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px;gap:5px;pointer-events:auto}
+.ctrl{border:1px solid #ff63df;background:#1c123bcc;color:white;border-radius:13px;font-size:21px;font-weight:bold}
+#up{grid-column:2}#left{grid-column:1;grid-row:2}#down{grid-column:2;grid-row:2}#right{grid-column:3;grid-row:2}
+#action{position:absolute;bottom:28px;right:18px;pointer-events:auto;border:0;border-radius:50%;width:76px;height:76px;background:linear-gradient(145deg,#ff42d2,#6a42ff);color:#fff;font-weight:900;box-shadow:0 0 24px #e53be6}
+#panel{display:none;position:fixed;inset:0;background:#080612eF;align-items:center;justify-content:center;padding:18px}
+.sheet{width:min(440px,100%);background:linear-gradient(145deg,#20102d,#101525);border:1px solid #ff55d6;border-radius:20px;padding:20px;box-shadow:0 0 35px #b32ca866}
+.sheet h2{margin:0 0 6px;color:#ff68df;letter-spacing:1px}.muted{color:#c7bad0;font-size:13px}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:16px 0}
+.opt{background:#211b32;color:white;border:1px solid #514064;border-radius:12px;padding:12px;text-align:left}
+.opt.active{border-color:#ff5edc;background:#44204a}
+#apply,#close{border:0;border-radius:12px;padding:12px 16px;font-weight:bold;margin-right:8px}
+#apply{background:#ff4acb;color:#190a1b}#close{background:#393147;color:white}
+#toast{position:fixed;bottom:115px;left:50%;transform:translateX(-50%);background:#160e25dd;border:1px solid #ff59d5;padding:9px 13px;border-radius:10px;display:none;font-size:13px}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+ <div class="brand">GRAND VICE</div><div class="money">$ 2 500</div>
+ <div class="hint">Explore Miami • Va au salon « INK VICE » et appuie sur ACTION</div>
+ <div id="controls">
+  <button class="ctrl" id="up">▲</button><button class="ctrl" id="left">◀</button>
+  <button class="ctrl" id="down">▼</button><button class="ctrl" id="right">▶</button>
+ </div>
+ <button id="action">ACTION</button>
+</div>
+<div id="toast"></div>
+<div id="panel"><div class="sheet">
+ <h2>INK VICE — TATTOO STUDIO</h2>
+ <p class="muted">Choisis un premier tatouage pour ton personnage. Démo : les motifs sont des aperçus de personnalisation.</p>
+ <div class="options" id="options">
+  <button class="opt active" data-tat="sleeve">🐉 Manche complète</button>
+  <button class="opt" data-tat="tribal">⚡ Tribal</button>
+  <button class="opt" data-tat="rose">🌹 Rose & lettrage</button>
+  <button class="opt" data-tat="lion">🦁 Tête de lion</button>
+  <button class="opt" data-tat="neck">🖤 Tatouage du cou</button>
+  <button class="opt" data-tat="none">✖ Aucun tatouage</button>
+ </div>
+ <p class="muted" id="preview">Aperçu sélectionné : manche complète.</p>
+ <button id="apply">APPLIQUER</button><button id="close">FERMER</button>
+</div></div>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+let W,H,px=0,py=0,selected='sleeve',tattoo='none',near=false,toastTimer;
+function resize(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=innerWidth;H=innerHeight}
+addEventListener('resize',resize);resize();px=innerWidth/2;py=innerHeight*.65;
+const keys={};function bind(id,k){let b=document.getElementById(id);b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))}
+bind('up','up');bind('down','down');bind('left','left');bind('right','right');
+function rect(x,y,w,h,col){ctx.fillStyle=col;ctx.fillRect(x,y,w,h)}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ // stylized Miami street
+ let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#252044');g.addColorStop(.48,'#35204b');g.addColorStop(.49,'#24202c');g.addColorStop(1,'#11131d');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ // skyline
+ for(let i=0;i<13;i++){let x=i*W/12-15,bh=70+(i*37%120);rect(x,105-bh,42,bh,'#17172b');for(let yy=115-bh;yy<95;yy+=13)for(let xx=x+8;xx<x+36;xx+=12)rect(xx,yy,4,5,(i+yy)%3?'#ff65d8':'#62d9ff')}
+ // road and sidewalks
+ rect(0,H*.48,W,H*.52,'#24232d');rect(0,H*.48,W,5,'#ff58d5');rect(0,H*.51,W,3,'#51445b');
+ for(let x=20;x<W;x+=95){rect(x,H*.72,34,3,'#f3d5a5')}
+ // palm trees
+ for(let x=40;x<W;x+=Math.max(130,W/4)){rect(x,H*.30,8,H*.19,'#241a25');ctx.strokeStyle='#15121f';ctx.lineWidth=5;for(let a=-2;a<=2;a++){ctx.beginPath();ctx.moveTo(x+4,H*.30);ctx.quadraticCurveTo(x+a*28,H*.22,x+a*40,H*.27);ctx.stroke()}}
+ // tattoo shop
+ let sx=W*.68, sy=H*.43;rect(sx-55,sy-60,125,88,'#171225');rect(sx-49,sy-54,113,75,'#372344');rect(sx-42,sy-44,98,18,'#ff3fc9');ctx.fillStyle='#1a0c22';ctx.font='bold 13px Arial';ctx.fillText('INK VICE',sx-30,sy-31);rect(sx-18,sy-15,35,42,'#0b0c17');rect(sx-10,sy-8,19,35,'#5e3b70');
+ // player
+ ctx.fillStyle='#090910';ctx.beginPath();ctx.arc(px,py-26,12,0,Math.PI*2);ctx.fill();rect(px-12,py-15,24,37,'#111018');rect(px-13,py+19,9,22,'#08080e');rect(px+4,py+19,9,22,'#08080e');
+ ctx.strokeStyle='#ff4fcf';ctx.lineWidth=2;if(tattoo!=='none'){ctx.beginPath();ctx.moveTo(px+9,py-7);ctx.lineTo(px+11,py+13);ctx.stroke()}
+ // proximity
+ near=Math.hypot(px-(sx+5),py-(sy+35))<105;
+ if(near){ctx.fillStyle='#fff';ctx.font='bold 14px Arial';ctx.textAlign='center';ctx.fillText('SALON INK VICE — ACTION',W/2,H*.22);ctx.textAlign='left'}
+ let speed=2.6;if(keys.up)py-=speed;if(keys.down)py+=speed;if(keys.left)px-=speed;if(keys.right)px+=speed;px=Math.max(18,Math.min(W-18,px));py=Math.max(H*.28,Math.min(H-55,py));
+ requestAnimationFrame(draw)
+}
+draw();
+const panel=document.getElementById('panel'),preview=document.getElementById('preview');
+document.getElementById('action').onclick=()=>{if(near)panel.style.display='flex';else showToast('Approche-toi du salon INK VICE pour te faire tatouer.')};
+document.getElementById('close').onclick=()=>panel.style.display='none';
+document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{document.querySelectorAll('.opt').forEach(x=>x.classList.remove('active'));b.classList.add('active');selected=b.dataset.tat;preview.textContent='Aperçu sélectionné : '+b.textContent.trim()+'.'});
+document.getElementById('apply').onclick=()=>{tattoo=selected;panel.style.display='none';showToast(tattoo==='none'?'Tatouage retiré.':'Nouveau tatouage appliqué !')};
+function showToast(t){let el=document.getElementById('toast');el.textContent=t;el.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.style.display='none',2200)}
+</script>
+</body></html>
